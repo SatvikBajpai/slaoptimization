@@ -20,6 +20,13 @@ wheels/
 .installed.cfg
 *.egg
 
+# Development files that aren't needed
+*.py.bak
+temp.py
+fix_*.sh
+order_priortizat
+.venv/
+
 # Jupyter Notebook
 .ipynb_checkpoints
 *.ipynb
@@ -38,6 +45,9 @@ env/
 *.xlsx
 # Keep only specific Excel files if needed in the future
 # !template.xlsx
+
+# Version specific files
+=*.*
 
 # Local environment files
 .env

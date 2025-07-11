@@ -142,7 +142,7 @@ def filter_current_day_orders(orders_df, processing_date):
 
 def simulate_order_processing(orders_df, num_pickers, num_bikers, processing_date, picking_time_mins=15, 
                       scheduling_strategy="FCFS", enable_batching=False, batch_size=2,
-                      batching_num_bikers=0, verbose=False):
+                      batching_num_bikers=0, initial_orders_count=0, verbose=False):
     """
     Simulate order processing based on given constraints
     
@@ -159,6 +159,7 @@ def simulate_order_processing(orders_df, num_pickers, num_bikers, processing_dat
     enable_batching (bool): Whether to enable batching of morning orders
     batch_size (int): Maximum number of orders that can be batched together
     batching_num_bikers (int): Number of bikers assigned for batched delivery (0 means all bikers can do batching)
+    initial_orders_count (int): Number of orders already present at store opening time (initial condition)
     verbose (bool): Whether to print detailed logs
     
     Returns:
@@ -239,6 +240,36 @@ def simulate_order_processing(orders_df, num_pickers, num_bikers, processing_dat
     df['Order Date'] = df['Order Placed Date Time'].dt.date
     df['Is Previous Day'] = False  # No previous day orders
     
+    # Generate initial orders (orders already present when store opens)
+    if initial_orders_count > 0 and verbose:
+        print(f"Adding {initial_orders_count} initial orders present at store opening time")
+    
+    # Create initial orders if requested
+    if initial_orders_count > 0:
+        # Get a sample of existing orders to use as templates for initial orders
+        if len(df) >= initial_orders_count:
+            initial_order_templates = df.sample(n=initial_orders_count) if len(df) > initial_orders_count else df.copy()
+        else:
+            # If we don't have enough orders, use what we have and duplicate some
+            initial_order_templates = pd.concat([df] * (initial_orders_count // len(df) + 1)).head(initial_orders_count)
+            
+        # Create initial orders dataframe
+        initial_orders = initial_order_templates.copy()
+        
+        # Set order IDs for initial orders (prefix with "INIT-" to distinguish them)
+        for i, idx in enumerate(initial_orders.index):
+            initial_orders.at[idx, 'Order No'] = f"INIT-{i+1}"
+        
+        # Set all initial orders to have been placed right at store opening time
+        initial_orders['Order Placed Date Time'] = store_open_time - pd.Timedelta(minutes=30)  # 30 minutes before store opens
+        initial_orders['Is Initial Order'] = True
+        
+        # Concatenate with original orders
+        df = pd.concat([initial_orders, df], ignore_index=True)
+    else:
+        # Mark all existing orders as not initial
+        df['Is Initial Order'] = False
+    
     # Initialize order processing time
     for idx in df.index:
         df.at[idx, 'Order Placed Time For Processing'] = df.at[idx, 'Order Placed Date Time']
@@ -313,10 +344,22 @@ def simulate_order_processing(orders_df, num_pickers, num_bikers, processing_dat
             ready_for_delivery = orders_to_deliver[orders_to_deliver['Picking End Time'] <= current_time].copy()
             
             if not ready_for_delivery.empty:
-                # Identify morning orders for potential batching
+                # Identify morning orders and initial orders for potential batching
                 if enable_batching:
-                    morning_orders = ready_for_delivery[ready_for_delivery['Order Placed Date Time'] < early_order_cutoff_time].copy()
-                    non_morning_orders = ready_for_delivery[ready_for_delivery['Order Placed Date Time'] >= early_order_cutoff_time].copy()
+                    # Include both morning orders and initial orders for batching
+                    morning_orders = ready_for_delivery[
+                        (ready_for_delivery['Order Placed Date Time'] < early_order_cutoff_time) | 
+                        (ready_for_delivery['Is Initial Order'] == True)
+                    ].copy()
+                    non_morning_orders = ready_for_delivery[
+                        (ready_for_delivery['Order Placed Date Time'] >= early_order_cutoff_time) & 
+                        (ready_for_delivery['Is Initial Order'] != True)
+                    ].copy()
+                        
+                    if 'Is Initial Order' in morning_orders.columns and morning_orders['Is Initial Order'].any():
+                        initial_order_count = morning_orders['Is Initial Order'].sum()
+                        if verbose and initial_order_count > 0:
+                            print(f"Processing {initial_order_count} initial orders for batching")
                     
                     # Process morning orders for batching if any are available
                     if not morning_orders.empty:

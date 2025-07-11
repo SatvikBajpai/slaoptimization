@@ -189,8 +189,12 @@ def display_simulation_results(simulation_results, show_charts=True):
         # Create card-like container for batch info
         st.markdown("### 📦 Batching Performance")
         
-        # Create metrics in 3 columns
-        batch_cols = st.columns(3)
+        # Count initial orders if they exist
+        initial_orders = result_df[result_df['Order No'].str.contains('INIT-', na=False) if 'Order No' in result_df.columns else False]
+        initial_order_count = len(initial_orders) if not initial_orders.empty else 0
+        
+        # Create metrics in 4 columns
+        batch_cols = st.columns(4)
         with batch_cols[0]:
             st.metric(
                 "Total Batched Orders", 
@@ -205,6 +209,13 @@ def display_simulation_results(simulation_results, show_charts=True):
         with batch_cols[2]:
             avg_batch_size = num_batched_orders / len(batch_ids) if len(batch_ids) > 0 else 0
             st.metric("Average Batch Size", f"{avg_batch_size:.1f}")
+            
+        with batch_cols[3]:
+            st.metric(
+                "Initial Orders", 
+                initial_order_count,
+                help="Orders present at store opening time"
+            )
         
         # Display SLA performance comparison
         if num_batched_orders > 0:
@@ -1133,6 +1144,10 @@ def main():
             enable_batching = st.checkbox("Enable Order Batching", value=False, 
                                         help="When enabled, multiple orders in the same direction can be assigned to a single biker")
             
+            # Add number of initial orders (orders at store opening)
+            initial_orders_count = st.slider("Initial Orders (at store opening)", 0, 20, 5,
+                                           help="Number of orders already in the system when the dark store opens. These orders will be included in batching if enabled.")
+            
             if enable_batching:
                 batch_col1, batch_col2 = st.columns(2)
                 
@@ -1154,7 +1169,7 @@ def main():
             sim_col1, sim_col2 = st.columns(2)
             
             # Define function to run all strategies and compare results
-            def run_all_strategies(forecast_date, num_pickers, num_bikers, picking_time_mins, enable_batching, batch_size, batching_num_bikers):
+            def run_all_strategies(forecast_date, num_pickers, num_bikers, picking_time_mins, enable_batching, batch_size, batching_num_bikers, initial_orders_count=0):
                 """Run simulations for all available strategies and compare results"""
                 strategies = ["FCFS", "MAXIMIZE_ORDERS", "MAXIMIZE_SLA"]
                 all_results = {}
@@ -1175,6 +1190,7 @@ def main():
                         enable_batching=enable_batching,
                         batch_size=batch_size,
                         batching_num_bikers=batching_num_bikers,
+                        initial_orders_count=initial_orders_count,
                         verbose=False
                     )
                     all_results[strategy] = results
@@ -1222,6 +1238,7 @@ def main():
                                 enable_batching=enable_batching,
                                 batch_size=batch_size,
                                 batching_num_bikers=batching_num_bikers,
+                                initial_orders_count=initial_orders_count,
                                 verbose=False
                             )
                             
@@ -1293,7 +1310,8 @@ def main():
                                 picking_time_mins,
                                 enable_batching,
                                 batch_size,
-                                batching_num_bikers
+                                batching_num_bikers,
+                                initial_orders_count
                             )
                             
                             # Store results in session state
@@ -1525,11 +1543,11 @@ def main():
                 # Show explanation of each strategy
                 with st.expander("📖 Strategy Explanations"):
                     st.markdown("""
-                    **FCFS (First Come First Served)**: Orders are processed in the order they were received. This is a fair approach but may not optimize for SLA or order count.
-                    
-                    **MAXIMIZE_ORDERS**: Prioritizes shorter delivery trips to maximize the total number of orders delivered. Good when you want to handle as many orders as possible.
-                    
-                    **MAXIMIZE_SLA**: Prioritizes orders that are at risk of breaching SLA, based on remaining time until breach. Best when meeting delivery time commitments is critical.
+**FCFS (First Come First Served)**: Orders are processed in the order they were received. This is a fair approach but may not optimize for SLA or order count.
+
+**MAXIMIZE_ORDERS**: Prioritizes shorter delivery trips to maximize the total number of orders delivered. Good when you want to handle as many orders as possible.
+
+**MAXIMIZE_SLA**: Prioritizes orders that are at risk of breaching SLA, based on remaining time until breach. Best when meeting delivery time commitments is critical.
                     """)
                 
                 # Allow user to select which strategy results to view
