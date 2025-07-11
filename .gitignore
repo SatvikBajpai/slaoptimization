@@ -1,0 +1,60 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+
+# Jupyter Notebook
+.ipynb_checkpoints
+*.ipynb
+analyze_excel.ipynb
+
+# Virtual environments
+venv/
+ENV/
+env/
+
+# macOS
+.DS_Store
+
+# Excel temp files
+~$*.xlsx
+*.xlsx
+# Keep only specific Excel files if needed in the future
+# !template.xlsx
+
+# Local environment files
+.env
+.env.local
+
+# VS Code
+.vscode/
+
+# Backup files
+*.bak
+app.py.bak
+
+# Temporary files
+temp.py
+test_openpyxl.py
+
+# Script files we don't need for the clean repo
+fix_dependencies.sh
+fix_openpyxl.sh
+install_dependencies.sh
